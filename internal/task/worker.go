@@ -2,10 +2,7 @@ package task
 
 import (
 	"context"
-	"io"
-	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -14,14 +11,16 @@ import (
 // WorkerPool управляет пулом воркеров для обработки задач
 type WorkerPool struct {
 	svc       *Service
+	storage   Storage
 	workerNum int
 	wg        sync.WaitGroup
 	tasksCh   chan *Task
 }
 
-func NewWorkerPool(svc *Service, workerNum int) *WorkerPool {
+func NewWorkerPool(svc *Service, storage Storage, workerNum int) *WorkerPool {
 	return &WorkerPool{
 		svc:       svc,
+		storage:   storage,
 		workerNum: workerNum,
 		tasksCh:   make(chan *Task, 100),
 	}
@@ -64,42 +63,29 @@ func (p *WorkerPool) processTask(ctx context.Context, t *Task) {
 	t.UpdatedAt = time.Now()
 
 	for _, url := range t.URLs {
-		if err := downloadFile(ctx, url, "downloads"); err != nil {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
 			t.Status = StatusFailed
 			t.Error = err.Error()
-			log.Printf("failed to download url %s: %v", url, err)
+			return
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Status = StatusFailed
+			t.Error = err.Error()
+			return
+		}
+
+		err = p.storage.Save(ctx, filepath.Base(url), resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			t.Status = StatusFailed
+			t.Error = err.Error()
 			return
 		}
 	}
 
 	t.Status = StatusCompleted
 	t.UpdatedAt = time.Now()
-}
-
-// downloadFile скачивает файл по URL в указанную папку
-func downloadFile(ctx context.Context, url string, dir string) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		return err
-	}
-
-	fileName := filepath.Join(dir, filepath.Base(url))
-	f, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = io.Copy(f, resp.Body)
-	return err
 }
