@@ -10,7 +10,7 @@ import (
 )
 
 // таймаут на скачивание одного файла
-const fileDownloadTimeout = 30 * time.Second
+const fileDownloadTimeout = 3 * time.Minute
 
 // WorkerPool управляет пулом воркеров для обработки задач
 type WorkerPool struct {

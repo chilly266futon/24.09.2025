@@ -14,6 +14,21 @@ const (
 	StatusFailed
 )
 
+func (s TaskStatus) String() string {
+	switch s {
+	case StatusPending:
+		return "pending"
+	case StatusRunning:
+		return "running"
+	case StatusCompleted:
+		return "completed"
+	case StatusFailed:
+		return "failed"
+	default:
+		return "unknown"
+	}
+}
+
 // Task описывает задачу по скачиванию файлов
 type Task struct {
 	ID        string     `json:"id"`
