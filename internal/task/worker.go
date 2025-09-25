@@ -2,11 +2,15 @@ package task
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"path/filepath"
 	"sync"
 	"time"
 )
+
+// таймаут на скачивание одного файла
+const fileDownloadTimeout = 30 * time.Second
 
 // WorkerPool управляет пулом воркеров для обработки задач
 type WorkerPool struct {
@@ -63,29 +67,34 @@ func (p *WorkerPool) processTask(ctx context.Context, t *Task) {
 	t.UpdatedAt = time.Now()
 
 	for _, url := range t.URLs {
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			t.Status = StatusFailed
-			t.Error = err.Error()
-			return
-		}
+		fileCtx, cancel := context.WithTimeout(ctx, fileDownloadTimeout)
+		err := p.downloadWithStorage(fileCtx, url)
+		cancel()
 
-		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Status = StatusFailed
 			t.Error = err.Error()
-			return
-		}
-
-		err = p.storage.Save(ctx, filepath.Base(url), resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			t.Status = StatusFailed
-			t.Error = err.Error()
+			log.Printf("failed to download url %s: %v", url, err)
 			return
 		}
 	}
 
 	t.Status = StatusCompleted
 	t.UpdatedAt = time.Now()
+}
+
+// downloadWithStorage скачивает и сохраняет один файл
+func (p *WorkerPool) downloadWithStorage(ctx context.Context, url string) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return p.storage.Save(ctx, filepath.Base(url), resp.Body)
 }

@@ -6,10 +6,10 @@ import (
 	"net/http"
 )
 
-// NewHandlers возвращает Router с привязанными handler'ами
-func NewHandlers(svc *Service) http.Handler {
+// NewHandlersWithPool возвращает Router с привязанными handler'ами и воркер-пулом
+func NewHandlersWithPool(svc *Service, pool *WorkerPool) http.Handler {
 	r := mux.NewRouter()
-	r.HandleFunc("/tasks", createTaskHandler(svc)).Methods("POST")
+	r.HandleFunc("/tasks", createTaskHandler(svc, pool)).Methods("POST")
 	r.HandleFunc("/tasks", getAllTasksHandler(svc)).Methods("GET")
 	r.HandleFunc("/tasks/{id}", getTaskHandler(svc)).Methods("GET")
 	return r
@@ -20,8 +20,8 @@ type createTaskRequest struct {
 	URLs []string `json:"urls"`
 }
 
-// createTaskHandler создает новую задачу
-func createTaskHandler(svc *Service) http.HandlerFunc {
+// createTaskHandler создает новую задачу и добавляет её в воркер-пул
+func createTaskHandler(svc *Service, pool *WorkerPool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req createTaskRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -30,6 +30,7 @@ func createTaskHandler(svc *Service) http.HandlerFunc {
 		}
 
 		t := svc.Create(r.Context(), req.URLs)
+		pool.AddTask(t) // добавляем в очередь воркер-пула
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(t)
