@@ -2,6 +2,8 @@ package task
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"sync"
 	"time"
 
@@ -53,4 +55,43 @@ func (s *Service) GetAll(ctx context.Context) []*Task {
 		result = append(result, t)
 	}
 	return result
+}
+
+// SaveTasks сохраняет все задачи в файл
+func (s *Service) SaveTasks(filename string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	return encoder.Encode(s.tasks)
+}
+
+// LoadTasks загружает задачи из файла
+func (s *Service) LoadTasks(filename string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	file, err := os.Open(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer file.Close()
+
+	tasks := make(map[string]*Task)
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&tasks); err != nil {
+		return err
+	}
+
+	s.tasks = tasks
+	return nil
 }
