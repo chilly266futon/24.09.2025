@@ -15,10 +15,12 @@ func NewHandlers(svc *Service) http.Handler {
 	return r
 }
 
+// createTaskRequest описывает тело запроса на создание задачи
 type createTaskRequest struct {
 	URLs []string `json:"urls"`
 }
 
+// createTaskHandler создает новую задачу
 func createTaskHandler(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req createTaskRequest
@@ -34,6 +36,7 @@ func createTaskHandler(svc *Service) http.HandlerFunc {
 	}
 }
 
+// getAllTasksHandler возвращает все задачи
 func getAllTasksHandler(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tasks := svc.GetAll(r.Context())
@@ -42,6 +45,7 @@ func getAllTasksHandler(svc *Service) http.HandlerFunc {
 	}
 }
 
+// getTaskHandler возвращает задачу по ID
 func getTaskHandler(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
