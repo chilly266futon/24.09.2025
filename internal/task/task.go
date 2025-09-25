@@ -1,7 +1,6 @@
 package task
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -14,25 +13,6 @@ const (
 	StatusCompleted
 	StatusFailed
 )
-
-func (s TaskStatus) String() string {
-	switch s {
-	case StatusPending:
-		return "pending"
-	case StatusRunning:
-		return "running"
-	case StatusCompleted:
-		return "completed"
-	case StatusFailed:
-		return "failed"
-	default:
-		return "unknown"
-	}
-}
-
-func (s TaskStatus) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.String())
-}
 
 // Task описывает задачу по скачиванию файлов
 type Task struct {
