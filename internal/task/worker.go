@@ -66,7 +66,7 @@ func (p *WorkerPool) processTask(ctx context.Context, t *Task) {
 	for _, url := range t.URLs {
 		if err := downloadFile(ctx, url, "downloads"); err != nil {
 			t.Status = StatusFailed
-			t.Error = err
+			t.Error = err.Error()
 			log.Printf("failed to download url %s: %v", url, err)
 			return
 		}
@@ -77,7 +77,7 @@ func (p *WorkerPool) processTask(ctx context.Context, t *Task) {
 }
 
 // downloadFile скачивает файл по URL в указанную папку
-func downloadFile(ctx context.Context, url string, dir string) interface{} {
+func downloadFile(ctx context.Context, url string, dir string) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
