@@ -9,6 +9,9 @@ import (
 // NewHandlersWithPool возвращает Router с привязанными handler'ами и воркер-пулом
 func NewHandlersWithPool(svc *Service, pool *WorkerPool) http.Handler {
 	r := mux.NewRouter()
+	r.Use(RecoveryMW)
+	r.Use(LoggingMW)
+
 	r.HandleFunc("/tasks", createTaskHandler(svc, pool)).Methods("POST")
 	r.HandleFunc("/tasks", getAllTasksHandler(svc)).Methods("GET")
 	r.HandleFunc("/tasks/{id}", getTaskHandler(svc)).Methods("GET")
