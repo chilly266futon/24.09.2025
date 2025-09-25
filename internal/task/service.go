@@ -65,7 +65,7 @@ func (s *Service) SaveTasks(filename string) error {
 	tasks := make([]*Task, 0, len(s.tasks))
 	for _, t := range s.tasks {
 		clone := *t
-		if clone.Status == StatusPending {
+		if clone.Status == StatusRunning {
 			clone.Status = StatusPending
 			clone.Error = ""
 		}

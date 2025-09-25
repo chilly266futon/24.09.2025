@@ -54,3 +54,32 @@ func TestServiceSaveLoadTasks(t *testing.T) {
 		t.Errorf("expected status %v, got: %v", task.Status, got.Status)
 	}
 }
+
+func TestServiceLoadTasks_WithRunningReset(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	task := svc.Create(ctx, []string{"https://go.dev/dl/go1.25.1.darwin-arm64.pkg"})
+	task.Status = StatusRunning
+
+	filename := "test_tasks_running.json"
+	defer os.Remove(filename)
+
+	if err := svc.SaveTasks(filename); err != nil {
+		t.Errorf("failed to save tasks: %v", err)
+	}
+
+	svc2 := NewService()
+	if err := svc2.LoadTasks(filename); err != nil {
+		t.Errorf("failed to load tasks: %v", err)
+	}
+
+	got, ok := svc2.Get(ctx, task.ID)
+	if !ok {
+		t.Fatalf("expected task %s to be loaded", task.ID)
+	}
+
+	if got.Status != StatusPending {
+		t.Errorf("expected StatusPending after reload, got: %v", got.Status)
+	}
+}
