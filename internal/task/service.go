@@ -59,17 +59,25 @@ func (s *Service) GetAll(ctx context.Context) []*Task {
 
 // SaveTasks сохраняет все задачи в файл
 func (s *Service) SaveTasks(filename string) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	file, err := os.Create(filename)
+	tasks := make([]*Task, 0, len(s.tasks))
+	for _, t := range s.tasks {
+		clone := *t
+		if clone.Status == StatusPending {
+			clone.Status = StatusPending
+			clone.Error = ""
+		}
+		tasks = append(tasks, &clone)
+	}
+
+	data, err := json.MarshalIndent(tasks, "", "  ")
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(s.tasks)
+	return os.WriteFile(filename, data, 0644)
 }
 
 // LoadTasks загружает задачи из файла
@@ -77,21 +85,27 @@ func (s *Service) LoadTasks(filename string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	file, err := os.Open(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
 	}
-	defer file.Close()
 
-	tasks := make(map[string]*Task)
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&tasks); err != nil {
+	if len(data) == 0 {
+		s.tasks = make(map[string]*Task)
+		return nil
+	}
+
+	var tasks []*Task
+	if err = json.Unmarshal(data, &tasks); err != nil {
 		return err
 	}
 
-	s.tasks = tasks
+	s.tasks = make(map[string]*Task)
+	for _, t := range tasks {
+		s.tasks[t.ID] = t
+	}
 	return nil
 }
