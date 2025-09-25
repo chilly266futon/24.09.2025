@@ -37,4 +37,6 @@ type Task struct {
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	Error     string     `json:"error,omitempty"`
+
+	Done chan struct{} `json:"-"` // канал для уведомления о завершении задачи
 }

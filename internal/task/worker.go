@@ -39,23 +39,28 @@ func (p *WorkerPool) Start(ctx context.Context) {
 
 // AddTask добавляет задачу в очередь в обработку
 func (p *WorkerPool) AddTask(t *Task) {
+	if t.Done == nil {
+		t.Done = make(chan struct{})
+	}
 	p.tasksCh <- t
 }
 
 // Wait ждет завершения всех воркеров
 func (p *WorkerPool) Wait() {
-	close(p.tasksCh)
 	p.wg.Wait()
 }
 
 // worker один воркер, который берет задачи из канала и обрабатывает их
 func (p *WorkerPool) worker(ctx context.Context) {
 	defer p.wg.Done()
-	for t := range p.tasksCh {
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case t := <-p.tasksCh:
+			if t == nil {
+				continue
+			}
 			p.processTask(ctx, t)
 		}
 	}
@@ -63,6 +68,7 @@ func (p *WorkerPool) worker(ctx context.Context) {
 
 // processTask скачивает все файлы задачи
 func (p *WorkerPool) processTask(ctx context.Context, t *Task) {
+	defer close(t.Done) // сигнал о завершении задачи
 	t.Status = StatusRunning
 	t.UpdatedAt = time.Now()
 

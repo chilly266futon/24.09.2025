@@ -16,7 +16,7 @@ func (s *mockStorage) Save(ctx context.Context, filename string, r io.Reader) er
 	return err
 }
 
-func TestWorkerPoolProcessTask(t *testing.T) {
+func TestWorkerPoolProcessTask_Success(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("mockdata"))
 	}))
@@ -40,5 +40,29 @@ func TestWorkerPoolProcessTask(t *testing.T) {
 		t.Errorf("expected StatusCompleted, got %v", got.Status)
 	}
 
+	pool.Wait()
+}
+
+func TestWorkerPoolProcessTask_Failure(t *testing.T) {
+	svc := NewService()
+	storage := &mockStorage{}
+	pool := NewWorkerPool(svc, storage, 1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pool.Start(ctx)
+
+	task := svc.Create(ctx, []string{"http://badhost.local"})
+	pool.AddTask(task)
+
+	<-task.Done // ждем завершения
+
+	got, _ := svc.Get(ctx, task.ID)
+	if got.Status != StatusFailed {
+		t.Errorf("expected StatusFailed, got %v", got.Status)
+	}
+
+	cancel()
 	pool.Wait()
 }
