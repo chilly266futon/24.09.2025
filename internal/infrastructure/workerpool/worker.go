@@ -1,7 +1,9 @@
-package task
+package workerpool
 
 import (
 	"context"
+	"file-downloader-service/internal/domain"
+	"file-downloader-service/internal/usecase"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -14,19 +16,19 @@ const fileDownloadTimeout = 3 * time.Minute
 
 // WorkerPool управляет пулом воркеров для обработки задач
 type WorkerPool struct {
-	svc       *Service
-	storage   Storage
+	svc       *usecase.Service
+	storage   domain.Storage
 	workerNum int
 	wg        sync.WaitGroup
-	tasksCh   chan *Task
+	TasksCh   chan *domain.Task
 }
 
-func NewWorkerPool(svc *Service, storage Storage, workerNum int) *WorkerPool {
+func NewWorkerPool(svc *usecase.Service, storage domain.Storage, workerNum int) *WorkerPool {
 	return &WorkerPool{
 		svc:       svc,
 		storage:   storage,
 		workerNum: workerNum,
-		tasksCh:   make(chan *Task, 100),
+		TasksCh:   make(chan *domain.Task, 100),
 	}
 }
 
@@ -38,11 +40,11 @@ func (p *WorkerPool) Start(ctx context.Context) {
 }
 
 // AddTask добавляет задачу в очередь в обработку
-func (p *WorkerPool) AddTask(t *Task) {
+func (p *WorkerPool) AddTask(t *domain.Task) {
 	if t.Done == nil {
 		t.Done = make(chan struct{})
 	}
-	p.tasksCh <- t
+	p.TasksCh <- t
 }
 
 // Wait ждет завершения всех воркеров
@@ -57,7 +59,10 @@ func (p *WorkerPool) worker(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case t := <-p.tasksCh:
+		case t, ok := <-p.TasksCh:
+			if !ok {
+				return // канал закрыт
+			}
 			if t == nil {
 				continue
 			}
@@ -67,9 +72,15 @@ func (p *WorkerPool) worker(ctx context.Context) {
 }
 
 // processTask скачивает все файлы задачи
-func (p *WorkerPool) processTask(ctx context.Context, t *Task) {
-	defer close(t.Done) // сигнал о завершении задачи
-	t.Status = StatusRunning
+func (p *WorkerPool) processTask(ctx context.Context, t *domain.Task) {
+	defer func() {
+		select {
+		case <-t.Done:
+		default:
+			close(t.Done)
+		}
+	}()
+	t.Status = domain.StatusRunning
 	t.UpdatedAt = time.Now()
 
 	for _, url := range t.URLs {
@@ -78,14 +89,14 @@ func (p *WorkerPool) processTask(ctx context.Context, t *Task) {
 		cancel()
 
 		if err != nil {
-			t.Status = StatusFailed
+			t.Status = domain.StatusFailed
 			t.Error = err.Error()
 			log.Printf("failed to download url %s: %v", url, err)
 			return
 		}
 	}
 
-	t.Status = StatusCompleted
+	t.Status = domain.StatusCompleted
 	t.UpdatedAt = time.Now()
 }
 

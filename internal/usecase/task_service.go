@@ -1,8 +1,9 @@
-package task
+package usecase
 
 import (
 	"context"
 	"encoding/json"
+	"file-downloader-service/internal/domain"
 	"os"
 	"sync"
 	"time"
@@ -13,33 +14,34 @@ import (
 // Service управляет задачами в памяти
 type Service struct {
 	mu    sync.RWMutex
-	tasks map[string]*Task
+	tasks map[string]*domain.Task
 }
 
 func NewService() *Service {
 	return &Service{
-		tasks: make(map[string]*Task),
+		tasks: make(map[string]*domain.Task),
 	}
 }
 
 // Create создает новую задачу
-func (s *Service) Create(ctx context.Context, urls []string) *Task {
+func (s *Service) Create(ctx context.Context, urls []string) *domain.Task {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	t := &Task{
+	t := &domain.Task{
 		ID:        uuid.NewString(),
 		URLs:      urls,
-		Status:    StatusPending,
+		Status:    domain.StatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
+		Done:      make(chan struct{}),
 	}
 	s.tasks[t.ID] = t
 	return t
 }
 
 // Get возвращает задачу по ID
-func (s *Service) Get(ctx context.Context, id string) (*Task, bool) {
+func (s *Service) Get(ctx context.Context, id string) (*domain.Task, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	t, ok := s.tasks[id]
@@ -47,10 +49,10 @@ func (s *Service) Get(ctx context.Context, id string) (*Task, bool) {
 }
 
 // GetAll возвращает все задачи
-func (s *Service) GetAll(ctx context.Context) []*Task {
+func (s *Service) GetAll(ctx context.Context) []*domain.Task {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	result := make([]*Task, 0, len(s.tasks))
+	result := make([]*domain.Task, 0, len(s.tasks))
 	for _, t := range s.tasks {
 		result = append(result, t)
 	}
@@ -62,11 +64,11 @@ func (s *Service) SaveTasks(filename string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	tasks := make([]*Task, 0, len(s.tasks))
+	tasks := make([]*domain.Task, 0, len(s.tasks))
 	for _, t := range s.tasks {
 		clone := *t
-		if clone.Status == StatusRunning {
-			clone.Status = StatusPending
+		if clone.Status == domain.StatusRunning {
+			clone.Status = domain.StatusPending
 			clone.Error = ""
 		}
 		tasks = append(tasks, &clone)
@@ -94,16 +96,16 @@ func (s *Service) LoadTasks(filename string) error {
 	}
 
 	if len(data) == 0 {
-		s.tasks = make(map[string]*Task)
+		s.tasks = make(map[string]*domain.Task)
 		return nil
 	}
 
-	var tasks []*Task
+	var tasks []*domain.Task
 	if err = json.Unmarshal(data, &tasks); err != nil {
 		return err
 	}
 
-	s.tasks = make(map[string]*Task)
+	s.tasks = make(map[string]*domain.Task)
 	for _, t := range tasks {
 		s.tasks[t.ID] = t
 	}

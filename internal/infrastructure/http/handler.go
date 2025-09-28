@@ -1,13 +1,15 @@
-package task
+package handlers
 
 import (
 	"encoding/json"
+	"file-downloader-service/internal/infrastructure/workerpool"
+	"file-downloader-service/internal/usecase"
 	"github.com/gorilla/mux"
 	"net/http"
 )
 
 // NewHandlersWithPool возвращает Router с привязанными handler'ами и воркер-пулом
-func NewHandlersWithPool(svc *Service, pool *WorkerPool) http.Handler {
+func NewHandlersWithPool(svc *usecase.Service, pool *workerpool.WorkerPool) http.Handler {
 	r := mux.NewRouter()
 	r.Use(RecoveryMW)
 	r.Use(LoggingMW)
@@ -24,7 +26,7 @@ type createTaskRequest struct {
 }
 
 // createTaskHandler создает новую задачу и добавляет её в воркер-пул
-func createTaskHandler(svc *Service, pool *WorkerPool) http.HandlerFunc {
+func createTaskHandler(svc *usecase.Service, pool *workerpool.WorkerPool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req createTaskRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -41,7 +43,7 @@ func createTaskHandler(svc *Service, pool *WorkerPool) http.HandlerFunc {
 }
 
 // getAllTasksHandler возвращает все задачи
-func getAllTasksHandler(svc *Service) http.HandlerFunc {
+func getAllTasksHandler(svc *usecase.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tasks := svc.GetAll(r.Context())
 
@@ -63,7 +65,7 @@ func getAllTasksHandler(svc *Service) http.HandlerFunc {
 }
 
 // getTaskHandler возвращает задачу по ID
-func getTaskHandler(svc *Service) http.HandlerFunc {
+func getTaskHandler(svc *usecase.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := mux.Vars(r)["id"]
 

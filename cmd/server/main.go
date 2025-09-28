@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"errors"
+	"file-downloader-service/internal/domain"
+	http2 "file-downloader-service/internal/infrastructure/http"
+	"file-downloader-service/internal/infrastructure/storage"
+	"file-downloader-service/internal/infrastructure/workerpool"
+	"file-downloader-service/internal/usecase"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-
-	"file-downloader-service/internal/task"
 )
 
 const tasksFile = "tasks.json"
@@ -18,24 +21,24 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	svc := task.NewService()
+	svc := usecase.NewService()
 	// загружаем задачи при старте
 	if err := svc.LoadTasks(tasksFile); err != nil {
 		log.Fatalf("failed to load tasks: %v", err)
 	}
 
-	storage := task.NewLocalStorage("downloads")
-	pool := task.NewWorkerPool(svc, storage, 4)
+	localStorage := storage.NewLocalStorage("downloads")
+	pool := workerpool.NewWorkerPool(svc, localStorage, 4)
 	pool.Start(ctx)
 
 	// добавляем ранее незавершенные задачи в пул
 	for _, t := range svc.GetAll(ctx) {
-		if t.Status == task.StatusPending || t.Status == task.StatusRunning {
+		if t.Status == domain.StatusPending || t.Status == domain.StatusRunning {
 			pool.AddTask(t)
 		}
 	}
 
-	r := task.NewHandlersWithPool(svc, pool)
+	r := http2.NewHandlersWithPool(svc, pool)
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: r,

@@ -1,7 +1,8 @@
-package task
+package usecase
 
 import (
 	"context"
+	"file-downloader-service/internal/domain"
 	"os"
 	"testing"
 )
@@ -13,7 +14,7 @@ func TestServiceCreateGetAll(t *testing.T) {
 	urls := []string{"https://go.dev/dl/go1.25.1.darwin-arm64.pkg"}
 	task := svc.Create(ctx, urls)
 
-	if task.Status != StatusPending {
+	if task.Status != domain.StatusPending {
 		t.Errorf("expected StatusPending, got %v", task.Status)
 	}
 
@@ -60,7 +61,7 @@ func TestServiceLoadTasks_WithRunningReset(t *testing.T) {
 	ctx := context.Background()
 
 	task := svc.Create(ctx, []string{"https://go.dev/dl/go1.25.1.darwin-arm64.pkg"})
-	task.Status = StatusRunning
+	task.Status = domain.StatusRunning
 
 	filename := "test_tasks_running.json"
 	defer os.Remove(filename)
@@ -79,7 +80,7 @@ func TestServiceLoadTasks_WithRunningReset(t *testing.T) {
 		t.Fatalf("expected task %s to be loaded", task.ID)
 	}
 
-	if got.Status != StatusPending {
+	if got.Status != domain.StatusPending {
 		t.Errorf("expected StatusPending after reload, got: %v", got.Status)
 	}
 }

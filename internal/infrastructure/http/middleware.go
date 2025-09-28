@@ -1,4 +1,4 @@
-package task
+package handlers
 
 import (
 	"bytes"
@@ -26,6 +26,18 @@ func LoggingMW(next http.Handler) http.Handler {
 			log.Printf("%s %s", r.Method, r.URL.Path)
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+func RecoveryMW(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("panic recovered: %v", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
 		next.ServeHTTP(w, r)
 	})
 }
