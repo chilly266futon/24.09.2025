@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"errors"
-	"file-downloader-service/internal/domain"
-	http2 "file-downloader-service/internal/infrastructure/http"
-	"file-downloader-service/internal/infrastructure/storage"
-	"file-downloader-service/internal/infrastructure/workerpool"
-	"file-downloader-service/internal/usecase"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+
+	"file-downloader-service/internal/domain"
+	"file-downloader-service/internal/infrastructure/handlers"
+	"file-downloader-service/internal/infrastructure/storage"
+	"file-downloader-service/internal/infrastructure/workerpool"
+	"file-downloader-service/internal/usecase"
 )
 
 const tasksFile = "tasks.json"
@@ -38,7 +39,7 @@ func main() {
 		}
 	}
 
-	r := http2.NewHandlersWithPool(svc, pool)
+	r := handlers.NewHandlersWithPool(svc, pool)
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: r,
