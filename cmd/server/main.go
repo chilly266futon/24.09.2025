@@ -64,7 +64,7 @@ func main() {
 		}
 	}()
 
-	log.Printf("Starting server on %s:%d", cfg.Server.Host, cfg.Server.Port)
+	log.Printf("Starting server on %s:%s", cfg.Server.Host, cfg.Server.Port)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
