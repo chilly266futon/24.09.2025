@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"file-downloader-service/internal/infrastructure/config"
 	"log"
 	"net/http"
 	"os"
@@ -18,18 +19,23 @@ import (
 const tasksFile = "tasks.json"
 
 func main() {
+	cfg, err := config.LoadConfig("configs/config.yaml")
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
 	// контекст для graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	svc := usecase.NewService()
 	// загружаем задачи при старте
-	if err := svc.LoadTasks(tasksFile); err != nil {
+	if err := svc.LoadTasks(cfg.Tasks.File); err != nil {
 		log.Fatalf("failed to load tasks: %v", err)
 	}
 
-	localStorage := storage.NewLocalStorage("downloads")
-	pool := workerpool.NewWorkerPool(svc, localStorage, 4)
+	localStorage := storage.NewLocalStorage(cfg.Storage.DownloadsDir)
+	pool := workerpool.NewWorkerPool(svc, localStorage, cfg.WorkerPool.NumWorkers)
 	pool.Start(ctx)
 
 	// добавляем ранее незавершенные задачи в пул
@@ -41,7 +47,7 @@ func main() {
 
 	r := handlers.NewHandlersWithPool(svc, pool)
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    cfg.Server.Host + ":" + cfg.Server.Port,
 		Handler: r,
 	}
 
@@ -58,7 +64,7 @@ func main() {
 		}
 	}()
 
-	log.Println("Starting server on port :8080")
+	log.Printf("Starting server on %s:%d", cfg.Server.Host, cfg.Server.Port)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
